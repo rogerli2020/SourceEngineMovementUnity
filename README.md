@@ -4,6 +4,18 @@ A minimalist extension to Unity's Character Controller that enables Source and Q
 
 This character controller only works properly with the new input system.
 
+Features supported by this character controller:
+- Bunny hopping
+- Surfing
+- Quake and Source/GoldSrc style velocity calculations
+- Step offset
+- Ladders
+
+Features not supported by this character controller (for now):
+- Water movement
+- Ladder movement strats
+- GoldSrc movement strats such as MCJ
+
 # Setup
 
 ## Create an instance of MoveVars
