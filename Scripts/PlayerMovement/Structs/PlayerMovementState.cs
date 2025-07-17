@@ -21,9 +21,9 @@ namespace PlayerMovement.Structs
         public bool IsGrounded;
         public CollisionFlags CollisionFlags;
         public float SlopeLimit;
-        public float SlidingNormal;
         public List<Vector3> CollisionNormalsBuffer;
         public List<float> CollisionAnglesBuffer;
+        public List<Collider> CollisionCollidersBuffer;
         public bool OldIsGrounded;
         
         // movement base stats
@@ -49,6 +49,7 @@ namespace PlayerMovement.Structs
         // sliding and ladder
         public bool IsSliding;
         public Vector3 SlideSurfaceNormal;
+        public Collider SlideSurfaceCollider;
         public bool IsOnLadder;
 
         // external velocity

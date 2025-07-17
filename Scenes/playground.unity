@@ -4484,6 +4484,10 @@ PrefabInstance:
       propertyPath: m_Name
       value: SurfCharacterSingleplayer
       objectReference: {fileID: 0}
+    - target: {fileID: 8771154372724904747, guid: 93e0359d54cf85d4c960cfec4a8e032f, type: 3}
+      propertyPath: m_SkinWidth
+      value: 0.08
+      objectReference: {fileID: 0}
     m_RemovedComponents: []
     m_RemovedGameObjects: []
     m_AddedGameObjects: []

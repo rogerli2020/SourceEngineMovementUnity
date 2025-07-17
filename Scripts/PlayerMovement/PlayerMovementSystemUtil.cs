@@ -1,7 +1,6 @@
 ﻿using UnityEngine;
 using PlayerMovement.Enums;
-using Vector3 = UnityEngine.Vector3;
-
+using Unity.VisualScripting;
 
 namespace PlayerMovement
 {
@@ -14,15 +13,14 @@ namespace PlayerMovement
         /// </summary>
         public static void UpdateVelocity(ref Structs.PlayerMovementComponent pm)
         {
-            CheckMovementType(ref pm);
-            
-            // if sliding, follow airborne logic.
-            if (pm.IsSliding) pm.IsGrounded = false;
+            CheckSliding(ref pm);   // check if you're surfing
 
+            if (pm.IsSliding) pm.IsGrounded = false;    // if you're surfing, follow air logic.
+
+            HandleGravity(ref pm);
+            
             // apply external velocity.
             pm.Velocity += pm.ExternalVelocity;
-            
-            HandleGravity(ref pm);
             HandleJump(ref pm);
             
             HandleFriction(ref pm);
@@ -33,58 +31,83 @@ namespace PlayerMovement
             HandleSlide(ref pm);
         }
         
-        private static void CheckMovementType(ref Structs.PlayerMovementComponent pm)
+        private static void CheckSliding(ref Structs.PlayerMovementComponent pm)
         {
+            // can't be sliding or bouncing off shit if grabbed onto a ladder.
             if (pm.IsOnLadder)
             {
-                // can't be sliding or bouncing off shit if grabbed onto a ladder.
+                // cancel sliding
                 pm.IsSliding = false;
+                pm.SlideSurfaceNormal.x = 99f;
                 return;
             }
             
+            // if you're currently sliding, check if you're still sliding this frame.
             if (pm.IsSliding)
             {
-                pm.IsSliding = false;
-                for (int i = 0; i < pm.CollisionNormalsBuffer.Count; i++)
+                if (pm.CollisionFlags != CollisionFlags.None)
                 {
-                    Vector3 hitNormal = pm.CollisionNormalsBuffer[i];
-                    if (Vector3.Distance(hitNormal, pm.CollisionNormalsBuffer[i]) < 0.05f)
-                        pm.IsSliding = true;
+                    pm.IsSliding = false;
+                    for (int i = 0; i < pm.CollisionNormalsBuffer.Count; i++)
+                        if (Vector3.Distance(pm.CollisionNormalsBuffer[i], pm.SlideSurfaceNormal) < 0.01f)
+                        {
+                            pm.IsSliding = true;
+                        }
+                }
+                // to handle weird edge case where Character Controller somehow does not detect the sliding surface.
+                else
+                {
+                    float skinWidth = 0.1f;
+                    float expandedRadius = pm.Radius + skinWidth;
+                    float halfHeight = Mathf.Max(0f, (pm.Height * 0.5f) - pm.Radius);
+                    Vector3 up = Vector3.up;
+                    Vector3 point1 = pm.Origin + up * halfHeight;
+                    Vector3 point2 = pm.Origin - up * halfHeight;
+                    Collider[] overlaps = Physics.OverlapCapsule(point1, point2, expandedRadius);
+                
+                    pm.IsSliding = false;
+                    foreach (var collider in overlaps)
+                    {
+                        if (collider == pm.SlideSurfaceCollider)
+                            pm.IsSliding = true;
+                    }
                 }
             }
-
+            
+            // if not sliding, "reset" the SlideSurfaceNormal to something impossible.
+            if (!pm.IsSliding)
+            {
+                pm.SlideSurfaceNormal.x = 99f;
+                pm.SlideSurfaceCollider = null;
+            }
+            
+            // for all collided surfaces, regardless of whether you're sliding or not
             for (int i = 0; i < pm.CollisionNormalsBuffer.Count; i++)
             {
-                float hitAngle = pm.CollisionAnglesBuffer[i];
-                Vector3 hitNormal = pm.CollisionNormalsBuffer[i];
+                float       hitAngle    = pm.CollisionAnglesBuffer[i];
+                Vector3     hitNormal   = pm.CollisionNormalsBuffer[i];
+                Collider    hitCollider = pm.CollisionCollidersBuffer[i];
 
-                // if NOT sliding, then...
                 // absorb velocity upon collision with walls
                 if (hitAngle >= 87.5f)
-                {
-                    float yVelocity = pm.Velocity.y;
-                    pm.Velocity.y = 0f;
-                    pm.Velocity -= Vector3.Project(pm.Velocity, hitNormal);
-                    pm.Velocity.y = yVelocity;
-                }
+                    pm.Velocity = Vector3.ProjectOnPlane(pm.Velocity, hitNormal);
                 
-                if (hitAngle > pm.SlopeLimit && hitAngle < 87.5f)
+                // if not sliding this frame, check if you're sliding, maybe on a new surface?
+                if (hitAngle > pm.SlopeLimit && hitAngle < 87.5f && !pm.IsSliding)
                 {
+                    // if grounded previous frame?
+                    if (pm.OldIsGrounded)
+                        continue;   // probably just a step offset...
                     
-                    if (!pm.IsSliding && pm.OldIsGrounded)
-                    {
-                        // probably a step offset.
-                        pm.IsSliding = false;
-                        continue;
-                    }
+                    // if not grounded previous frame...
                     pm.IsSliding = true;
                     pm.SlideSurfaceNormal = hitNormal;
+                    pm.SlideSurfaceCollider = hitCollider;
                     return;
                 }
                 
-                pm.IsSliding = false;
-                
-                // if colliding with a plane at high speed
+                // if colliding with a plane at high speed AND not sliding, bounce off the surface
+                // at a fun angle
                 if (!pm.IsSliding && pm.Velocity.magnitude > 25f && hitAngle >= 5f)
                 {
                     float velocityLossFactor = 0.4f;
@@ -97,13 +120,13 @@ namespace PlayerMovement
                     pm.Velocity = shallowedDirection * (pm.Velocity.magnitude - speedAbsorbed);
                 }
             }
+            
         }
         
         private static void HandleSlide(ref Structs.PlayerMovementComponent pm)
         {
             if (!pm.IsSliding) return;
             pm.Velocity = Vector3.ProjectOnPlane(pm.Velocity, pm.SlideSurfaceNormal);
-            pm.ExternalVelocity = Vector3.ProjectOnPlane(pm.ExternalVelocity, pm.SlideSurfaceNormal);
         }
 
         private static void HandleFriction(ref Structs.PlayerMovementComponent pm)
@@ -196,8 +219,7 @@ namespace PlayerMovement
         }
 
         private static void HandleGravity(ref Structs.PlayerMovementComponent pm) 
-            => pm.Velocity.y -= ( (!pm.IsSliding) ? pm.MoveStats.gravity : pm.MoveStats.gravity)
-                                * pm.DeltaTime;
+            => pm.Velocity.y -= pm.MoveStats.gravity * pm.DeltaTime;
 
         /// <summary>
         /// Main driver function for updating crouch state. Called at each frame/tick.

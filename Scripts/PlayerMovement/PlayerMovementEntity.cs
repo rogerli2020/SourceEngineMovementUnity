@@ -38,6 +38,7 @@ namespace PlayerMovement
             _pmComponent.Radius = 0.45f;
             _pmComponent.CollisionNormalsBuffer = new List<Vector3>();
             _pmComponent.CollisionAnglesBuffer = new List<float>();
+            _pmComponent.CollisionCollidersBuffer = new List<Collider>();
             
             // initialize controller data
             _characterController.height = _pmComponent.Height;
@@ -126,6 +127,7 @@ namespace PlayerMovement
             _pmComponent.IsOnLadder = false;
             _pmComponent.CollisionNormalsBuffer.Clear();
             _pmComponent.CollisionAnglesBuffer.Clear();
+            _pmComponent.CollisionCollidersBuffer.Clear();
             Vector3 move = _pmComponent.Velocity * _pmComponent.DeltaTime;
             _characterController.Move(move);
         }
@@ -135,6 +137,7 @@ namespace PlayerMovement
             // add to buffers
             _pmComponent.CollisionNormalsBuffer.Add(hit.normal);
             _pmComponent.CollisionAnglesBuffer.Add(Vector3.Angle(Vector3.up, hit.normal));
+            _pmComponent.CollisionCollidersBuffer.Add(hit.collider);
             
             // if collided with a Ladder, set IsOnLadder to true
             if (hit.gameObject.TryGetComponent<Ladder>(out var ladder))
