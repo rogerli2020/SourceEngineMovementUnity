@@ -21,7 +21,6 @@ namespace PlayerMovement
 
             // apply external velocity.
             pm.Velocity += pm.ExternalVelocity;
-            pm.ExternalVelocity = Vector3.zero;
             
             HandleGravity(ref pm);
             HandleJump(ref pm);

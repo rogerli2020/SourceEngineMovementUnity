@@ -21,8 +21,7 @@ namespace PlayerMovement
         // private variables just for keeping track of stuff
         private float _currentPitch = 0f;
         private float _currentYaw = 0f;
-        private Vector3 _collisionHitNormal;
-        private float _collisionHitAngle;
+        private Vector3 _externalVelocity = Vector3.zero;
         
         private void Start()
         {
@@ -83,6 +82,10 @@ namespace PlayerMovement
             _pmComponent.CurrentPitch = _currentPitch;
             _pmComponent.CurrentYaw = _currentYaw;
             _pmComponent.Cmd = _playerMovementInputComponent;
+            _pmComponent.ExternalVelocity = _externalVelocity;
+            
+            // zero out external velocity
+            _externalVelocity = Vector3.zero;
         }
 
         private void ProcessMovementState()
@@ -129,19 +132,24 @@ namespace PlayerMovement
         
         void OnControllerColliderHit(ControllerColliderHit hit)
         {
-            // collect collision information to be processed by util functions
-            _collisionHitNormal = hit.normal;
-            _collisionHitAngle = Vector3.Angle(Vector3.up, _collisionHitNormal);
-            
             // add to buffers
-            _pmComponent.CollisionNormalsBuffer.Add(_collisionHitNormal);
-            _pmComponent.CollisionAnglesBuffer.Add(_collisionHitAngle);
+            _pmComponent.CollisionNormalsBuffer.Add(hit.normal);
+            _pmComponent.CollisionAnglesBuffer.Add(Vector3.Angle(Vector3.up, hit.normal));
             
+            // if collided with a Ladder, set IsOnLadder to true
             if (hit.gameObject.TryGetComponent<Ladder>(out var ladder))
             {
                 _pmComponent.IsOnLadder = true;
             }
         }
+
+        public void SetExternalVelocity(Vector3 externalVelocity)
+        {
+            _externalVelocity = externalVelocity;
+        }
+        
+        
+        
         
          // void HandleJetpack()
          // {
