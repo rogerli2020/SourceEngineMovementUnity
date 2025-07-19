@@ -247,8 +247,8 @@ MonoBehaviour:
   _predictionType: 0
   _graphicalObject: {fileID: 0}
   _detachGraphicalObject: 0
-  _enableStateForwarding: 1
-  _networkTransform: {fileID: 0}
+  _enableStateForwarding: 0
+  _networkTransform: {fileID: -6236462904381465274}
   _ownerInterpolation: 1
   _ownerSmoothedProperties: 255
   _adaptiveInterpolation: 3
@@ -258,7 +258,7 @@ MonoBehaviour:
   _teleportThreshold: 1
   <PrefabId>k__BackingField: 9
   <SpawnableCollectionId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 14786701794143570646
+  <AssetPathHash>k__BackingField: 0
   <SceneId>k__BackingField: 0
   SerializedTransformProperties:
     Position: {x: -24.66, y: 9, z: 4.64}
@@ -299,7 +299,7 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
-  _synchronizeRotation: 1
+  _synchronizeRotation: 0
   _rotationSnapping:
     X: 0
     Y: 0

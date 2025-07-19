@@ -133,6 +133,10 @@ namespace PlayerMovement
         private void TimeManager_OnPostTick()
         {
             CreateReconcile();
+            
+            // client authoritative rotations...
+            if (IsOwner) 
+                ServerRpc_Rotate(_camera.transform.localEulerAngles, transform.localEulerAngles);
         }
         
         public void CreateReconcile()
@@ -163,9 +167,9 @@ namespace PlayerMovement
             if (!_playerMovementInputEntity) return default;
             _playerMovementInputComponent = _playerMovementInputEntity.GetPlayerMovementInputComponent();
             ReplicateData md = new ReplicateData(
-                _pmComponent.Forward,
-                _pmComponent.Right,
-                _pmComponent.Up,
+                transform.forward,
+                transform.right,
+                transform.up,
                 transform.rotation,
                 _playerMovementInputComponent.ForwardMovement,
                 _playerMovementInputComponent.SideMovement,
@@ -216,9 +220,18 @@ namespace PlayerMovement
 
         private void ProcessMovementState()
         {
-            PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);
+            // PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);
             PlayerMovementSystemUtil.UpdateVelocity(ref _pmComponent);
             PlayerMovementSystemUtil.UpdateCrouch(ref _pmComponent);
+        }
+
+        [ServerRpc]
+        void ServerRpc_Rotate(Vector3 cameraLocalEulerAngles, Vector3 transformLocalEulerAngles)
+        {
+            _characterController.enabled = false;
+            _camera.transform.localEulerAngles = cameraLocalEulerAngles;
+            transform.localEulerAngles = transformLocalEulerAngles;
+            _characterController.enabled = true;
         }
 
         private void ApplyMovementState()
@@ -243,13 +256,6 @@ namespace PlayerMovement
             }
             else if ( Mathf.Abs(_characterController.height - _pmComponent.Height) > 0.0001f )
                 _characterController.height = _pmComponent.Height;
-            
-            // 3. update rotations
-            if (IsOwner)
-            {
-                _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
-                transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
-            }
             
             // 4. clear old collision buffers and let Move() populate new ones for the new frame.
             // calculate and apply displacement.
@@ -282,6 +288,18 @@ namespace PlayerMovement
         public void SetExternalVelocity(Vector3 externalVelocity)
         {
             _externalVelocity = externalVelocity;
+        }
+
+        public void Update()
+        {
+            if (!IsOwner) return;
+            
+            // handle rotations client side every frame
+            _pmComponent.Cmd = _playerMovementInputEntity.GetPlayerMovementInputComponent();    // pull every frame
+            PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);       // update every frame
+            _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
+            transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
+            
         }
     }
 }
