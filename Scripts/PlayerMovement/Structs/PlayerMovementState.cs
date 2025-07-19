@@ -24,6 +24,7 @@ namespace PlayerMovement.Structs
         public List<Vector3> CollisionNormalsBuffer;
         public List<float> CollisionAnglesBuffer;
         public List<Collider> CollisionCollidersBuffer;
+        public Collider[] SlidingColliderCheckBuffer;
         public bool OldIsGrounded;
         
         // movement base stats

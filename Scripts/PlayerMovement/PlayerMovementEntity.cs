@@ -66,10 +66,6 @@ namespace PlayerMovement
             _currentYaw = 
                 transform.eulerAngles.y + _playerMovementInputComponent.DeltaYaw * cameraSensitivity;
             
-            // update input cmd
-            _playerMovementInputComponent.CurrentPitch = _currentPitch;
-            _playerMovementInputComponent.CurrentYaw = _currentYaw;
-            
             // update pmComponent
             _pmComponent.Origin = transform.position;
             _pmComponent.Forward = transform.forward;

@@ -63,12 +63,13 @@ namespace PlayerMovement
                     Vector3 up = Vector3.up;
                     Vector3 point1 = pm.Origin + up * halfHeight;
                     Vector3 point2 = pm.Origin - up * halfHeight;
-                    Collider[] overlaps = Physics.OverlapCapsule(point1, point2, expandedRadius);
+                    int numCollisions = Physics.OverlapCapsuleNonAlloc(point1, point2, 
+                        expandedRadius, pm.SlidingColliderCheckBuffer);
                 
                     pm.IsSliding = false;
-                    foreach (var collider in overlaps)
+                    for (int i = 0; i < numCollisions; i++)
                     {
-                        if (collider == pm.SlideSurfaceCollider)
+                        if (pm.SlidingColliderCheckBuffer[i] == pm.SlideSurfaceCollider)
                             pm.IsSliding = true;
                     }
                 }
@@ -220,6 +221,13 @@ namespace PlayerMovement
 
         private static void HandleGravity(ref Structs.PlayerMovementComponent pm) 
             => pm.Velocity.y -= pm.MoveStats.gravity * pm.DeltaTime;
+
+        public static void UpdateRotation(ref Structs.PlayerMovementComponent pm)
+        {
+            pm.CurrentPitch -= pm.Cmd.DeltaPitch;
+            pm.CurrentPitch = Mathf.Clamp(pm.CurrentPitch, -90f, 90f);
+            pm.CurrentYaw += pm.Cmd.DeltaYaw;
+        }
 
         /// <summary>
         /// Main driver function for updating crouch state. Called at each frame/tick.

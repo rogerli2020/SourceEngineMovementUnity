@@ -14,7 +14,6 @@ namespace PlayerMovementInput
         
         // temporary, for rocket jumping
         private InputAction _fireAction;
-
         
         void Start()
         {
@@ -43,25 +42,14 @@ namespace PlayerMovementInput
             Vector2 moveValue = _moveAction.ReadValue<Vector2>();
             bool crouchPressed = _crouchAction.IsPressed();
             bool jumpPressed = _jumpAction.IsPressed();
-            // Vector2 scrollWheelValue = _scrollWheelAction.ReadValue<Vector2>();
 
             _playerMovementInputComponent.DeltaPitch += lookValue.y;
             _playerMovementInputComponent.DeltaYaw += lookValue.x;
             _playerMovementInputComponent.ForwardMovement = moveValue.y;
             _playerMovementInputComponent.SideMovement = moveValue.x;
             
-            // if (scrollWheelValue.y < 0f)
-            //     _playerMovementInputComponent.Crouching = true;
-            // else if (scrollWheelValue.y > 0f)
-            //     _playerMovementInputComponent.UpMovement = 1f;
-            
             _playerMovementInputComponent.UpMovement = jumpPressed ? 1f : 0f;
             _playerMovementInputComponent.Crouching = crouchPressed;
-            
-                        
-            // temporary, for rocket jumping
-            // _playerMovementInputComponent.Fired = _fireAction.IsPressed();
-            
         }
 
         public PlayerMovementInputComponent GetPlayerMovementInputComponent()
