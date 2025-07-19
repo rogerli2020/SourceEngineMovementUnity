@@ -222,11 +222,11 @@ namespace PlayerMovement
         private static void HandleGravity(ref Structs.PlayerMovementComponent pm) 
             => pm.Velocity.y -= pm.MoveStats.gravity * pm.DeltaTime;
 
-        public static void UpdateRotation(ref Structs.PlayerMovementComponent pm)
+        public static void UpdateRotation(ref Structs.PlayerMovementComponent pm, float mouseSensitivity)
         {
-            pm.CurrentPitch -= pm.Cmd.DeltaPitch;
+            pm.CurrentPitch -= pm.Cmd.DeltaPitch * mouseSensitivity;
             pm.CurrentPitch = Mathf.Clamp(pm.CurrentPitch, -90f, 90f);
-            pm.CurrentYaw += pm.Cmd.DeltaYaw;
+            pm.CurrentYaw += pm.Cmd.DeltaYaw * mouseSensitivity;
         }
 
         /// <summary>

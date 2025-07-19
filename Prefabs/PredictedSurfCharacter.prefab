@@ -184,7 +184,7 @@ MonoBehaviour:
   _componentIndexCache: 0
   _addedNetworkObject: {fileID: -8932471255650151862}
   _networkObjectCache: {fileID: -8932471255650151862}
-  cameraSensitivity: 0.25
+  cameraSensitivity: 0.1
 --- !u!143 &8771154372724904747
 CharacterController:
   m_ObjectHideFlags: 0
@@ -245,20 +245,20 @@ MonoBehaviour:
   NetworkObserver: {fileID: 0}
   _enablePrediction: 1
   _predictionType: 0
-  _graphicalObject: {fileID: 1875243686625576760}
-  _detachGraphicalObject: 1
+  _graphicalObject: {fileID: 0}
+  _detachGraphicalObject: 0
   _enableStateForwarding: 1
   _networkTransform: {fileID: 0}
   _ownerInterpolation: 1
-  _ownerSmoothedProperties: 4294967295
+  _ownerSmoothedProperties: 255
   _adaptiveInterpolation: 3
   _spectatorSmoothedProperties: 255
   _spectatorInterpolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  <PrefabId>k__BackingField: 6
+  <PrefabId>k__BackingField: 9
   <SpawnableCollectionId>k__BackingField: 0
-  <AssetPathHash>k__BackingField: 10682917305003060197
+  <AssetPathHash>k__BackingField: 14786701794143570646
   <SceneId>k__BackingField: 0
   SerializedTransformProperties:
     Position: {x: -24.66, y: 9, z: 4.64}
@@ -286,10 +286,10 @@ MonoBehaviour:
     Position: 1
     Rotation: 1
     Scale: 0
-  _interpolation: 64
-  _extrapolation: 0
+  _interpolation: 2
+  _extrapolation: 2
   _enableTeleport: 0
-  _teleportThreshold: 0
+  _teleportThreshold: 1
   _clientAuthoritative: 0
   _sendToOwner: 1
   _interval: 1
@@ -327,7 +327,7 @@ GameObject:
   m_Icon: {fileID: 0}
   m_NavMeshLayer: 0
   m_StaticEditorFlags: 0
-  m_IsActive: 0
+  m_IsActive: 1
 --- !u!4 &1464517662246530597
 Transform:
   m_ObjectHideFlags: 0
@@ -613,7 +613,7 @@ MonoBehaviour:
   _extrapolation: 2
   _enableTeleport: 0
   _teleportThreshold: 1
-  _clientAuthoritative: 0
+  _clientAuthoritative: 1
   _sendToOwner: 1
   _interval: 1
   _synchronizePosition: 1

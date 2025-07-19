@@ -33,22 +33,21 @@ namespace PlayerMovement
         public struct ReplicateData : IReplicateData
         {
             private uint _tick;
-            public readonly float DeltaYaw;
-            public readonly float DeltaPitch;
-            public readonly float ForwardMovement;
-            public readonly float SideMovement;
-            public readonly float UpMovement;
-            public readonly bool Crouching;
-
-            public ReplicateData(float deltaYaw, float deltaPitch, 
+            public readonly Vector3 Forward, Right, Up;
+            public readonly Quaternion Rotation;
+            public readonly float ForwardMovement, SideMovement, UpMovement;
+            public bool Crouching;
+            public ReplicateData(Vector3 forward, Vector3 right, Vector3 up, Quaternion rotation,
                 float forwardMovement, float sideMovement, float upMovement, bool crouching) : this()
             {
-                DeltaYaw = deltaYaw;
-                DeltaPitch = deltaPitch;
-                ForwardMovement = forwardMovement;
-                SideMovement = sideMovement;
-                UpMovement = upMovement;
-                Crouching = crouching;
+                this.Forward = forward;
+                this.Right = right;
+                this.Up = up;
+                this.Rotation = rotation;
+                this.ForwardMovement = forwardMovement;
+                this.SideMovement = sideMovement;
+                this.UpMovement = upMovement;
+                this.Crouching = crouching;
             }
 
             public void Dispose() { }
@@ -63,17 +62,13 @@ namespace PlayerMovement
             public readonly Vector3 Origin;
             public readonly Vector3 Velocity;
             public readonly float Height;
-            public readonly Vector3 PlayerRotation;
-            public readonly Vector3 CameraRotation;
 
             public ReconcileData(Vector3 origin, Vector3 velocity, float height, 
-                Vector3 playerRotation, Vector3 cameraRotation) : this()
+                Quaternion playerRotation, Quaternion cameraRotation) : this()
             {
                 Origin = origin;
                 Velocity = velocity;
                 Height = height;
-                PlayerRotation = playerRotation;
-                CameraRotation = cameraRotation;
             }
 
             public void Dispose() { }
@@ -81,13 +76,12 @@ namespace PlayerMovement
             public void SetTick(uint value) => _tick = value;
         }
 
-        private void InitializationShared()
+        public override void OnStartNetwork()
         {
             // assign important references
             _camera = gameObject.GetComponentInChildren<Camera>();
             _playerMovementInputEntity = GetComponent<PlayerMovementInputEntity>();
             _characterController = GetComponent<CharacterController>();
-            _characterController.enabled = true;
             
             // initialize state data
             _pmComponent = new Structs.PlayerMovementComponent();
@@ -105,16 +99,9 @@ namespace PlayerMovement
             _characterController.radius = _pmComponent.Radius;
         }
         
-        public override void OnStartServer()
-        {
-            base.OnStartServer();
-            InitializationShared();
-        }
-        
         public override void OnStartClient()
         {
             base.OnStartClient();
-            InitializationShared();
 
             if (IsOwner)
             {
@@ -124,7 +111,7 @@ namespace PlayerMovement
             else
             {
                 _camera.enabled = false;
-                // _playerMovementInputEntity.enabled = false;
+                _playerMovementInputEntity.enabled = false;
             }
             
             // for predictions
@@ -148,16 +135,14 @@ namespace PlayerMovement
             CreateReconcile();
         }
         
-        public override void CreateReconcile()
+        public void CreateReconcile()
         {
-            Debug.Log(transform.localEulerAngles);
-            Debug.Log(_camera.transform.localEulerAngles);
             ReconcileData rd = new ReconcileData(
                     transform.position,
                     _pmComponent.Velocity,
                     _characterController.height,
-                    transform.localEulerAngles,
-                    _camera.transform.localEulerAngles
+                    transform.rotation,
+                    _camera.transform.rotation
                 );
             
             ReconcileState(rd);
@@ -166,20 +151,22 @@ namespace PlayerMovement
         [Reconcile]
         private void ReconcileState(ReconcileData data, Channel channel = Channel.Unreliable)
         {
-            _characterController.Move(data.Origin);
+            _characterController.enabled = false;
+            transform.position = data.Origin;
             _pmComponent.Velocity = data.Velocity;
             _characterController.height = data.Height;
-            transform.localEulerAngles = data.PlayerRotation;
-            _camera.transform.localEulerAngles = data.CameraRotation;
+            _characterController.enabled = true;
         }
 
         private ReplicateData CreateReplicateData()
         {
-            if (!base.IsOwner) return default;
+            if (!_playerMovementInputEntity) return default;
             _playerMovementInputComponent = _playerMovementInputEntity.GetPlayerMovementInputComponent();
             ReplicateData md = new ReplicateData(
-                _playerMovementInputComponent.DeltaYaw * cameraSensitivity,
-                _playerMovementInputComponent.DeltaPitch * cameraSensitivity,
+                _pmComponent.Forward,
+                _pmComponent.Right,
+                _pmComponent.Up,
+                transform.rotation,
                 _playerMovementInputComponent.ForwardMovement,
                 _playerMovementInputComponent.SideMovement,
                 _playerMovementInputComponent.UpMovement,
@@ -190,11 +177,17 @@ namespace PlayerMovement
         }
         
         [Replicate]
-        private void RunInputs(ReplicateData data, ReplicateState state = ReplicateState.Invalid, 
+        private void RunInputs(
+            ReplicateData data, 
+            FishNet.Object.Prediction.ReplicateState state = FishNet.Object.Prediction.ReplicateState.Invalid, 
             Channel channel = Channel.Unreliable)
         {
-            _playerMovementInputComponent.DeltaYaw = data.DeltaYaw;
-            _playerMovementInputComponent.DeltaPitch = data.DeltaPitch;
+            _characterController.enabled = false;
+            transform.forward = data.Forward;
+            transform.right = data.Right;
+            transform.up = data.Up;
+            transform.rotation = data.Rotation;
+            _characterController.enabled = true;
             _playerMovementInputComponent.ForwardMovement = data.ForwardMovement;
             _playerMovementInputComponent.SideMovement = data.SideMovement;
             _playerMovementInputComponent.UpMovement = data.UpMovement;
@@ -216,17 +209,14 @@ namespace PlayerMovement
             _pmComponent.IsGrounded = _characterController.isGrounded;
             _pmComponent.CollisionFlags = _characterController.collisionFlags;
             _pmComponent.SlopeLimit = _characterController.slopeLimit;
-            _pmComponent.DeltaTime = (float)base.TimeManager.TickDelta;
+            _pmComponent.DeltaTime = (float)TimeManager.TickDelta;
             _pmComponent.Cmd = _playerMovementInputComponent;
             _pmComponent.ExternalVelocity = _externalVelocity;
-            
-            // zero out external velocity
-            _externalVelocity = Vector3.zero;
         }
 
         private void ProcessMovementState()
         {
-            PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent);
+            PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);
             PlayerMovementSystemUtil.UpdateVelocity(ref _pmComponent);
             PlayerMovementSystemUtil.UpdateCrouch(ref _pmComponent);
         }
@@ -247,6 +237,7 @@ namespace PlayerMovement
                         ? _pmComponent.HeightToRecover 
                         : (_pmComponent.HeightToRecover / 2f) * (_pmComponent.DeltaTime / .05f);
                 _characterController.height += heightToRecoverThisFrame;
+                _characterController.enabled = true;
                 _characterController.Move(Vector3.up * heightToRecoverThisFrame / 2f);
                 _pmComponent.HeightToRecover -= heightToRecoverThisFrame;
             }
@@ -254,8 +245,11 @@ namespace PlayerMovement
                 _characterController.height = _pmComponent.Height;
             
             // 3. update rotations
-            _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
-            transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
+            if (IsOwner)
+            {
+                _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
+                transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
+            }
             
             // 4. clear old collision buffers and let Move() populate new ones for the new frame.
             // calculate and apply displacement.
@@ -264,7 +258,11 @@ namespace PlayerMovement
             _pmComponent.CollisionAnglesBuffer.Clear();
             _pmComponent.CollisionCollidersBuffer.Clear();
             Vector3 move = _pmComponent.Velocity * _pmComponent.DeltaTime;
+            _characterController.enabled = true;
             _characterController.Move(move);
+            
+            // if (IsServerInitialized) Debug.Log($"Server: {transform.rotation}");
+            // if (IsOwner) Debug.Log($"Owner: {transform.rotation}");
         }
         
         void OnControllerColliderHit(ControllerColliderHit hit)
