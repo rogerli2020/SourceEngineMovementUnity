@@ -142,7 +142,7 @@ namespace PlayerMovement
             if (horizontalSpeed <= 0f) return;
             
             float dropInSpeed = Mathf.Max(pm.MoveStats.stopSpeed, horizontalSpeed)
-                         * pm.MoveStats.friction * pm.DeltaTime;;
+                         * pm.MoveStats.friction * pm.DeltaTime;
             
             // apply the drop in velocity.
             pm.Velocity = Vector3.Normalize(pm.Velocity) * Mathf.Max(0f, horizontalSpeed - dropInSpeed);

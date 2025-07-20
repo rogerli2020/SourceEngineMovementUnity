@@ -130,7 +130,7 @@ GameObject:
   - component: {fileID: 5299009013970741017}
   - component: {fileID: 8771154372724904747}
   - component: {fileID: -8932471255650151862}
-  - component: {fileID: -6236462904381465274}
+  - component: {fileID: 2789630085362047157}
   m_Layer: 6
   m_Name: PredictedSurfCharacter
   m_TagString: Untagged
@@ -230,7 +230,7 @@ MonoBehaviour:
   <PredictedOwner>k__BackingField: {fileID: 0}
   NetworkBehaviours:
   - {fileID: 5299009013970741017}
-  - {fileID: -6236462904381465274}
+  - {fileID: 2789630085362047157}
   InitializedParentNetworkBehaviour: {fileID: 0}
   InitializedNestedNetworkObjects:
   - {fileID: 2989617217358214605}
@@ -248,7 +248,7 @@ MonoBehaviour:
   _graphicalObject: {fileID: 0}
   _detachGraphicalObject: 0
   _enableStateForwarding: 0
-  _networkTransform: {fileID: -6236462904381465274}
+  _networkTransform: {fileID: 2789630085362047157}
   _ownerInterpolation: 1
   _ownerSmoothedProperties: 255
   _adaptiveInterpolation: 3
@@ -265,7 +265,7 @@ MonoBehaviour:
     Rotation: {x: 0, y: 1, z: 0, w: 0}
     Scale: {x: 1, y: 1, z: 1}
     IsValid: 1
---- !u!114 &-6236462904381465274
+--- !u!114 &2789630085362047157
 MonoBehaviour:
   m_ObjectHideFlags: 0
   m_CorrespondingSourceObject: {fileID: 0}
@@ -280,7 +280,7 @@ MonoBehaviour:
   _componentIndexCache: 1
   _addedNetworkObject: {fileID: -8932471255650151862}
   _networkObjectCache: {fileID: -8932471255650151862}
-  _componentConfiguration: 1
+  _componentConfiguration: 0
   _synchronizeParent: 0
   _packing:
     Position: 1
@@ -304,7 +304,7 @@ MonoBehaviour:
     X: 0
     Y: 0
     Z: 0
-  _synchronizeScale: 1
+  _synchronizeScale: 0
   _scaleSensitivity: 0.001
   _scaleSnapping:
     X: 0

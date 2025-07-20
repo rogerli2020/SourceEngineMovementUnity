@@ -26,24 +26,24 @@ namespace PlayerMovement
         
         // private variables just for keeping track of stuff
         private Vector3 _externalVelocity = Vector3.zero;
-        private float _accumulatedDeltaPitch;
-        private float _accumulatedDeltaYaw;
         
+        // IsOwnerHost
+        private bool _ownedByHostAndIsHost = false;
+
         // replication data
         public struct ReplicateData : IReplicateData
         {
             private uint _tick;
             public readonly Vector3 Forward, Right, Up;
-            public readonly Quaternion Rotation;
             public readonly float ForwardMovement, SideMovement, UpMovement;
-            public bool Crouching;
-            public ReplicateData(Vector3 forward, Vector3 right, Vector3 up, Quaternion rotation,
+            public readonly bool Crouching;
+            public ReplicateData(Vector3 forward, Vector3 right, Vector3 up,
                 float forwardMovement, float sideMovement, float upMovement, bool crouching) : this()
             {
+                _tick = 0u;
                 this.Forward = forward;
                 this.Right = right;
                 this.Up = up;
-                this.Rotation = rotation;
                 this.ForwardMovement = forwardMovement;
                 this.SideMovement = sideMovement;
                 this.UpMovement = upMovement;
@@ -63,9 +63,9 @@ namespace PlayerMovement
             public readonly Vector3 Velocity;
             public readonly float Height;
 
-            public ReconcileData(Vector3 origin, Vector3 velocity, float height, 
-                Quaternion playerRotation, Quaternion cameraRotation) : this()
+            public ReconcileData(Vector3 origin, Vector3 velocity, float height) : this()
             {
+                _tick = 0;
                 Origin = origin;
                 Velocity = velocity;
                 Height = height;
@@ -97,13 +97,17 @@ namespace PlayerMovement
             // initialize controller data
             _characterController.height = _pmComponent.Height;
             _characterController.radius = _pmComponent.Radius;
+            
+            // check if this is host
+            _ownedByHostAndIsHost = CheckOwnedByHostAndIsHost();
+            if (_ownedByHostAndIsHost) Debug.Log("This Player is Host.");
         }
         
         public override void OnStartClient()
         {
             base.OnStartClient();
 
-            if (IsOwner)
+            if (IsOwner || _ownedByHostAndIsHost)
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
@@ -114,7 +118,6 @@ namespace PlayerMovement
                 _playerMovementInputEntity.enabled = false;
             }
             
-            // for predictions
             base.TimeManager.OnTick += TimeManager_OnTick;
             base.TimeManager.OnPostTick += TimeManager_OnPostTick;
         }
@@ -127,16 +130,22 @@ namespace PlayerMovement
         
         private void TimeManager_OnTick()
         {
-            RunInputs(CreateReplicateData());
+            if (IsOwner || _ownedByHostAndIsHost)
+            {
+                ReplicateData data = CreateReplicateData();
+                RunInputs(data); 
+                ServerRpc_Rotate(_camera.transform.rotation, transform.rotation);
+            }
+            else
+            {
+                RunInputs(default(ReplicateData));
+            }
         }
         
         private void TimeManager_OnPostTick()
         {
+            if (!IsServerStarted) return;
             CreateReconcile();
-            
-            // client authoritative rotations...
-            if (IsOwner) 
-                ServerRpc_Rotate(_camera.transform.localEulerAngles, transform.localEulerAngles);
         }
         
         public void CreateReconcile()
@@ -144,9 +153,7 @@ namespace PlayerMovement
             ReconcileData rd = new ReconcileData(
                     transform.position,
                     _pmComponent.Velocity,
-                    _characterController.height,
-                    transform.rotation,
-                    _camera.transform.rotation
+                    _characterController.height
                 );
             
             ReconcileState(rd);
@@ -164,17 +171,15 @@ namespace PlayerMovement
 
         private ReplicateData CreateReplicateData()
         {
-            if (!_playerMovementInputEntity) return default;
-            _playerMovementInputComponent = _playerMovementInputEntity.GetPlayerMovementInputComponent();
+            PlayerMovementInputComponent curInput = _playerMovementInputEntity.GetPlayerMovementInputComponent();
             ReplicateData md = new ReplicateData(
-                transform.forward,
-                transform.right,
-                transform.up,
-                transform.rotation,
-                _playerMovementInputComponent.ForwardMovement,
-                _playerMovementInputComponent.SideMovement,
-                _playerMovementInputComponent.UpMovement,
-                _playerMovementInputComponent.Crouching
+                    transform.forward,
+                    transform.right,
+                    transform.up,
+                    curInput.ForwardMovement,
+                    curInput.SideMovement,
+                    curInput.UpMovement,
+                    curInput.Crouching
                 );
             
             return md;
@@ -183,64 +188,53 @@ namespace PlayerMovement
         [Replicate]
         private void RunInputs(
             ReplicateData data, 
-            FishNet.Object.Prediction.ReplicateState state = FishNet.Object.Prediction.ReplicateState.Invalid, 
+            ReplicateState state = ReplicateState.Invalid, 
             Channel channel = Channel.Unreliable)
         {
-            _characterController.enabled = false;
-            transform.forward = data.Forward;
-            transform.right = data.Right;
-            transform.up = data.Up;
-            transform.rotation = data.Rotation;
-            _characterController.enabled = true;
-            _playerMovementInputComponent.ForwardMovement = data.ForwardMovement;
-            _playerMovementInputComponent.SideMovement = data.SideMovement;
-            _playerMovementInputComponent.UpMovement = data.UpMovement;
-            _playerMovementInputComponent.Crouching = data.Crouching;
-            
-            CaptureMovementState();
-            ProcessMovementState();
+            CaptureMovementState(data);
+            ProcessMovementState(); 
             ApplyMovementState();
         }
         
-        private void CaptureMovementState()
+        private void CaptureMovementState(ReplicateData replicateData)
         {
             // update pmComponent
+            _pmComponent.curTick = TimeManager.Tick;
+            _pmComponent.Forward = replicateData.Forward;
+            _pmComponent.Right = replicateData.Right;
+            _pmComponent.Up = replicateData.Up;
             _pmComponent.Origin = transform.position;
-            _pmComponent.Forward = transform.forward;
-            _pmComponent.Right = transform.right;
-            _pmComponent.Up = transform.up;
             _pmComponent.OldIsGrounded = _pmComponent.IsGrounded;
             _pmComponent.IsGrounded = _characterController.isGrounded;
             _pmComponent.CollisionFlags = _characterController.collisionFlags;
             _pmComponent.SlopeLimit = _characterController.slopeLimit;
-            _pmComponent.DeltaTime = (float)TimeManager.TickDelta;
-            _pmComponent.Cmd = _playerMovementInputComponent;
+            _pmComponent.DeltaTime = Time.fixedDeltaTime;
+            _pmComponent.Cmd.ForwardMovement = replicateData.ForwardMovement;
+            _pmComponent.Cmd.SideMovement = replicateData.SideMovement;
+            _pmComponent.Cmd.UpMovement = replicateData.UpMovement;
+            _pmComponent.Cmd.Crouching = replicateData.Crouching;
             _pmComponent.ExternalVelocity = _externalVelocity;
         }
 
         private void ProcessMovementState()
         {
-            // PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);
             PlayerMovementSystemUtil.UpdateVelocity(ref _pmComponent);
             PlayerMovementSystemUtil.UpdateCrouch(ref _pmComponent);
         }
 
         [ServerRpc]
-        void ServerRpc_Rotate(Vector3 cameraLocalEulerAngles, Vector3 transformLocalEulerAngles)
+        void ServerRpc_Rotate(Quaternion cameraRotation, Quaternion transformRotation)
         {
             _characterController.enabled = false;
-            _camera.transform.localEulerAngles = cameraLocalEulerAngles;
-            transform.localEulerAngles = transformLocalEulerAngles;
+            _camera.transform.rotation = cameraRotation;
+            transform.rotation = transformRotation;
             _characterController.enabled = true;
         }
 
         private void ApplyMovementState()
         {
             // 1. check if is on ladder. (this is a pretty bad approach, but it does works like a ladder)
-            if (_pmComponent.IsOnLadder)
-                _characterController.slopeLimit = 91f;
-            else
-                _characterController.slopeLimit = 45f;
+            _characterController.slopeLimit = (_pmComponent.IsOnLadder) ? 91f : 45f;
             
             // 2. update crouch state and height nonlinearly and gradually
             if (_pmComponent.HeightToRecover > 0f)
@@ -266,9 +260,6 @@ namespace PlayerMovement
             Vector3 move = _pmComponent.Velocity * _pmComponent.DeltaTime;
             _characterController.enabled = true;
             _characterController.Move(move);
-            
-            // if (IsServerInitialized) Debug.Log($"Server: {transform.rotation}");
-            // if (IsOwner) Debug.Log($"Owner: {transform.rotation}");
         }
         
         void OnControllerColliderHit(ControllerColliderHit hit)
@@ -279,27 +270,30 @@ namespace PlayerMovement
             _pmComponent.CollisionCollidersBuffer.Add(hit.collider);
             
             // if collided with a Ladder, set IsOnLadder to true
-            if (hit.gameObject.TryGetComponent<Ladder>(out var ladder))
-            {
+            if (hit.gameObject.TryGetComponent<Ladder>(out var _))
                 _pmComponent.IsOnLadder = true;
-            }
-        }
-
-        public void SetExternalVelocity(Vector3 externalVelocity)
-        {
-            _externalVelocity = externalVelocity;
         }
 
         public void Update()
         {
-            if (!IsOwner) return;
+            if (!IsOwner && !_ownedByHostAndIsHost) return;
             
             // handle rotations client side every frame
             _pmComponent.Cmd = _playerMovementInputEntity.GetPlayerMovementInputComponent();    // pull every frame
             PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);       // update every frame
+            _characterController.enabled = false;
             _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
             transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
-            
+            _characterController.enabled = true;
         }
+
+        private bool CheckOwnedByHostAndIsHost()
+        {
+            return NetworkManager.ClientManager.Connection.ClientId == 0 && OwnerId == 0;
+        }
+        
+        public void SetExternalVelocity(Vector3 externalVelocity) 
+            => _externalVelocity = externalVelocity;
+        
     }
 }

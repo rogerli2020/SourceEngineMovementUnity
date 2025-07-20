@@ -7,6 +7,8 @@ namespace PlayerMovement.Structs
     
     public struct PlayerMovementComponent
     {
+        public uint curTick;
+        
         // positions
         public Vector3 Origin;
         public Vector3 Forward, Right, Up;
