@@ -291,7 +291,7 @@ MonoBehaviour:
   _enableTeleport: 0
   _teleportThreshold: 1
   _clientAuthoritative: 0
-  _sendToOwner: 1
+  _sendToOwner: 0
   _interval: 1
   _synchronizePosition: 1
   _positionSensitivity: 0.001

@@ -6,6 +6,7 @@ using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Object.Synchronizing;
 using FishNet.Transporting;
+using UnityEditor.Rendering;
 using Debug = UnityEngine.Debug;
 
 namespace PlayerMovement
@@ -28,7 +29,7 @@ namespace PlayerMovement
         private Vector3 _externalVelocity = Vector3.zero;
         
         // IsOwnerHost
-        private bool _ownedByHostAndIsHost = false;
+        private readonly SyncVar<bool> _isHost = new(false);
 
         // replication data
         public struct ReplicateData : IReplicateData
@@ -97,17 +98,13 @@ namespace PlayerMovement
             // initialize controller data
             _characterController.height = _pmComponent.Height;
             _characterController.radius = _pmComponent.Radius;
-            
-            // check if this is host
-            _ownedByHostAndIsHost = CheckOwnedByHostAndIsHost();
-            if (_ownedByHostAndIsHost) Debug.Log("This Player is Host.");
         }
         
         public override void OnStartClient()
         {
             base.OnStartClient();
 
-            if (IsOwner || _ownedByHostAndIsHost)
+            if (IsOwner)
             {
                 Cursor.lockState = CursorLockMode.Locked;
                 Cursor.visible = false;
@@ -120,6 +117,9 @@ namespace PlayerMovement
             
             base.TimeManager.OnTick += TimeManager_OnTick;
             base.TimeManager.OnPostTick += TimeManager_OnPostTick;
+            
+            // check if this is host
+            CheckOwnedByHostAndIsHost();
         }
         
         public override void OnStopNetwork()
@@ -130,11 +130,18 @@ namespace PlayerMovement
         
         private void TimeManager_OnTick()
         {
-            if (IsOwner || _ownedByHostAndIsHost)
+            if (IsOwner && !_isHost.Value)
             {
                 ReplicateData data = CreateReplicateData();
                 RunInputs(data); 
                 ServerRpc_Rotate(_camera.transform.rotation, transform.rotation);
+            }
+            else if (_isHost.Value)
+            {
+                // do not predict, if is host.
+                CaptureMovementState(CreateReplicateData());
+                ProcessMovementState();
+                ApplyMovementState();
             }
             else
             {
@@ -162,11 +169,13 @@ namespace PlayerMovement
         [Reconcile]
         private void ReconcileState(ReconcileData data, Channel channel = Channel.Unreliable)
         {
-            _characterController.enabled = false;
-            transform.position = data.Origin;
+            // _characterController.enabled = false;
+            // transform.position = data.Origin;
+            // _pmComponent.Velocity = data.Velocity;
+            // _characterController.height = data.Height;
+            // _characterController.enabled = true;
+            // _characterController.Move(data.Origin - transform.position);
             _pmComponent.Velocity = data.Velocity;
-            _characterController.height = data.Height;
-            _characterController.enabled = true;
         }
 
         private ReplicateData CreateReplicateData()
@@ -276,8 +285,7 @@ namespace PlayerMovement
 
         public void Update()
         {
-            if (!IsOwner && !_ownedByHostAndIsHost) return;
-            
+            if (!IsOwner) return;
             // handle rotations client side every frame
             _pmComponent.Cmd = _playerMovementInputEntity.GetPlayerMovementInputComponent();    // pull every frame
             PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);       // update every frame
@@ -289,7 +297,15 @@ namespace PlayerMovement
 
         private bool CheckOwnedByHostAndIsHost()
         {
-            return NetworkManager.ClientManager.Connection.ClientId == 0 && OwnerId == 0;
+            if (!IsServerStarted) return false;
+            if (NetworkManager.ClientManager.Connection.ClientId == 0 && OwnerId == 0)
+            {
+                _isHost.Value = true;
+                return true;
+            }
+
+            _isHost.Value = false;
+            return false;
         }
         
         public void SetExternalVelocity(Vector3 externalVelocity) 
