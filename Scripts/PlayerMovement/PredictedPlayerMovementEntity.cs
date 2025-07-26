@@ -1,4 +1,5 @@
-﻿using UnityEngine;
+﻿using System;
+using UnityEngine;
 using PlayerMovementInput;
 using System.Collections.Generic;
 using System.Numerics;
@@ -15,7 +16,7 @@ namespace PlayerMovement
     public class PredictedPlayerMovementEntity : NetworkBehaviour
     {
         // movement states
-        private Structs.PlayerMovementComponent _pmComponent;
+        private PlayerMovementComponent _pmComponent;
         
         // important references
         private Camera _camera;
@@ -53,7 +54,6 @@ namespace PlayerMovement
                 this.SideMovement = sideMovement;
                 this.UpMovement = upMovement;
                 this.Crouching = crouching;
-                _tick = 0;
             }
 
             public void Dispose() { }
@@ -81,6 +81,8 @@ namespace PlayerMovement
 
         public override void OnStartNetwork()
         {
+            base.OnStartNetwork();
+            
             // assign important references
             _camera = gameObject.GetComponentInChildren<Camera>();
             _playerMovementInputEntity = GetComponent<PlayerMovementInputEntity>();
@@ -101,6 +103,11 @@ namespace PlayerMovement
             // initialize controller data
             _characterController.height = _pmComponent.Height;
             _characterController.radius = _pmComponent.Radius;
+            
+            // tick
+            TimeManager.OnTick += TimeManager_OnTick;
+            TimeManager.OnUpdate += TimeManager_OnUpdate;
+            TimeManager.OnPostTick += TimeManager_OnPostTick;
         }
         
         public override void OnStartClient()
@@ -117,14 +124,12 @@ namespace PlayerMovement
                 _camera.enabled = false;
                 _playerMovementInputEntity.enabled = false;
             }
-            
-            TimeManager.OnTick += TimeManager_OnTick;
-            TimeManager.OnUpdate += TimeManager_OnUpdate;
-            TimeManager.OnPostTick += TimeManager_OnPostTick;
         }
-        
+
         public override void OnStopNetwork()
         {
+            base.OnStopNetwork();
+            
             TimeManager.OnTick -= TimeManager_OnTick;
             TimeManager.OnUpdate -= TimeManager_OnUpdate;
             TimeManager.OnPostTick -= TimeManager_OnPostTick;
@@ -132,28 +137,42 @@ namespace PlayerMovement
         
         private void TimeManager_OnTick()
         {
+            
             if (IsOwner)
             {
                 ReconcileState(default);
                 ReplicateData rd = CreateReplicateData();
                 RunInputs(rd, state:ReplicateState.Ticked); 
-                ServerRpc_Rotate(_camera.transform.rotation, transform.rotation);
+                if (!IsServerStarted)
+                    ServerRpc_Rotate(_camera.transform.rotation, transform.rotation);
+                else
+                {
+                    // apply rotations on host.
+                    _characterController.enabled = false;
+                    _camera.transform.rotation = _camera.transform.rotation;
+                    transform.rotation = transform.rotation;
+                    _characterController.enabled = true;
+                }
                 
                 // tickwise update on client only
-                CaptureMovementState(rd);
+                if (IsServerStarted) return;
+                CaptureMovementState(_currentReplicateData);
                 ProcessMovementState(); 
                 ApplyMovementState();
             }
             if (IsServerStarted)
             {
                 RunInputs(default, state:ReplicateState.Replayed);
+                CreateReconcile();
             }
         }
 
         private void TimeManager_OnUpdate()
         {
-            Debug.Log($"IsHost: {IsHostStarted}, IsServer: {IsServerStarted}");
-            
+        }
+
+        private void Update()
+        {
             if (IsOwner)
             {
                 // update rotation on client every frame.
@@ -168,8 +187,6 @@ namespace PlayerMovement
         
         private void TimeManager_OnPostTick()
         {
-            if (IsServerStarted)
-                CreateReconcile();
         }
         
         public override void CreateReconcile()
@@ -182,16 +199,21 @@ namespace PlayerMovement
             ReconcileState(rd);
         }
         
+        [Reconcile]
+        private void ReconcileState(ReconcileData data, Channel channel = Channel.Unreliable)
+        {
+            Debug.Log(Vector3.Distance(data.Origin, transform.position));
+            _pmComponent.Velocity = data.Velocity;
+            MoveCharacterController(data.Origin - transform.position);
+        }
+        
         [Replicate]
         private void RunInputs(
             ReplicateData data, 
             ReplicateState state = ReplicateState.Invalid, 
             Channel channel = Channel.Unreliable)
         {
-
-            Debug.Log(state.ToString());
-            
-            if ( (IsServerStarted) || state == ReplicateState.Replayed)
+            if ( (IsServerStarted) || state == ReplicateState.Replayed )
             {
                 // perform actual tick-wise update
                 CaptureMovementState(data);
@@ -204,19 +226,6 @@ namespace PlayerMovement
             }
             
             
-        }
-
-        [Reconcile]
-        private void ReconcileState(ReconcileData data, Channel channel = Channel.Unreliable)
-        {
-            MoveCharacterForcefully(data.Origin - transform.position);
-        }
-
-        private void MoveCharacterForcefully(Vector3 moveVector)
-        {
-            _characterController.enabled = false;
-            transform.position += moveVector;
-            _characterController.enabled = false;
         }
 
         private void MoveCharacterController(Vector3 moveVector)
