@@ -1,13 +1,14 @@
 ﻿using UnityEngine;
 using PlayerMovementInput;
 using System.Collections.Generic;
-using System.Diagnostics;
+using System.Numerics;
 using FishNet.Object;
 using FishNet.Object.Prediction;
 using FishNet.Object.Synchronizing;
 using FishNet.Transporting;
-using UnityEditor.Rendering;
-using Debug = UnityEngine.Debug;
+using PlayerMovement.Structs;
+using Quaternion = UnityEngine.Quaternion;
+using Vector3 = UnityEngine.Vector3;
 
 namespace PlayerMovement
 {
@@ -31,6 +32,10 @@ namespace PlayerMovement
         // IsOwnerHost
         private readonly SyncVar<bool> _isHost = new(false);
 
+        private ReplicateData _currentReplicateData;
+
+        private PlayerMovementComponent _pmComponentThisTick;
+        
         // replication data
         public struct ReplicateData : IReplicateData
         {
@@ -41,7 +46,6 @@ namespace PlayerMovement
             public ReplicateData(Vector3 forward, Vector3 right, Vector3 up,
                 float forwardMovement, float sideMovement, float upMovement, bool crouching) : this()
             {
-                _tick = 0u;
                 this.Forward = forward;
                 this.Right = right;
                 this.Up = up;
@@ -49,6 +53,7 @@ namespace PlayerMovement
                 this.SideMovement = sideMovement;
                 this.UpMovement = upMovement;
                 this.Crouching = crouching;
+                _tick = 0;
             }
 
             public void Dispose() { }
@@ -62,14 +67,11 @@ namespace PlayerMovement
             private uint _tick;
             public readonly Vector3 Origin;
             public readonly Vector3 Velocity;
-            public readonly float Height;
 
-            public ReconcileData(Vector3 origin, Vector3 velocity, float height) : this()
+            public ReconcileData(Vector3 origin, Vector3 velocity) : this()
             {
-                _tick = 0;
                 Origin = origin;
                 Velocity = velocity;
-                Height = height;
             }
 
             public void Dispose() { }
@@ -85,7 +87,7 @@ namespace PlayerMovement
             _characterController = GetComponent<CharacterController>();
             
             // initialize state data
-            _pmComponent = new Structs.PlayerMovementComponent();
+            _pmComponent = default;
             _pmComponent.MoveStats = MoveVars.Instance;
             _pmComponent.MoveType = Enums.MoveType.Default;
             _pmComponent.Height = 1.8f;
@@ -94,6 +96,7 @@ namespace PlayerMovement
             _pmComponent.CollisionAnglesBuffer = new List<float>();
             _pmComponent.CollisionCollidersBuffer = new List<Collider>();
             _pmComponent.SlidingColliderCheckBuffer = new Collider[16];
+            _pmComponentThisTick = _pmComponent;
             
             // initialize controller data
             _characterController.height = _pmComponent.Height;
@@ -115,67 +118,115 @@ namespace PlayerMovement
                 _playerMovementInputEntity.enabled = false;
             }
             
-            base.TimeManager.OnTick += TimeManager_OnTick;
-            base.TimeManager.OnPostTick += TimeManager_OnPostTick;
-            
-            // check if this is host
-            CheckOwnedByHostAndIsHost();
+            TimeManager.OnTick += TimeManager_OnTick;
+            TimeManager.OnUpdate += TimeManager_OnUpdate;
+            TimeManager.OnPostTick += TimeManager_OnPostTick;
         }
         
         public override void OnStopNetwork()
         {
-            base.TimeManager.OnTick -= TimeManager_OnTick;
-            base.TimeManager.OnPostTick -= TimeManager_OnPostTick;
+            TimeManager.OnTick -= TimeManager_OnTick;
+            TimeManager.OnUpdate -= TimeManager_OnUpdate;
+            TimeManager.OnPostTick -= TimeManager_OnPostTick;
         }
         
         private void TimeManager_OnTick()
         {
-            if (IsOwner && !_isHost.Value)
+            if (IsOwner)
             {
-                ReplicateData data = CreateReplicateData();
-                RunInputs(data); 
+                ReconcileState(default);
+                ReplicateData rd = CreateReplicateData();
+                RunInputs(rd, state:ReplicateState.Ticked); 
                 ServerRpc_Rotate(_camera.transform.rotation, transform.rotation);
-            }
-            else if (_isHost.Value)
-            {
-                // do not predict, if is host.
-                CaptureMovementState(CreateReplicateData());
-                ProcessMovementState();
+                
+                // tickwise update on client only
+                CaptureMovementState(rd);
+                ProcessMovementState(); 
                 ApplyMovementState();
             }
-            else
+            if (IsServerStarted)
             {
-                RunInputs(default(ReplicateData));
+                RunInputs(default, state:ReplicateState.Replayed);
+            }
+        }
+
+        private void TimeManager_OnUpdate()
+        {
+            Debug.Log($"IsHost: {IsHostStarted}, IsServer: {IsServerStarted}");
+            
+            if (IsOwner)
+            {
+                // update rotation on client every frame.
+                _pmComponent.Cmd = _playerMovementInputEntity.GetPlayerMovementInputComponent();
+                PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);
+                _characterController.enabled = false;
+                _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
+                transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
+                _characterController.enabled = true;
             }
         }
         
         private void TimeManager_OnPostTick()
         {
-            if (!IsServerStarted) return;
-            CreateReconcile();
+            if (IsServerStarted)
+                CreateReconcile();
         }
         
-        public void CreateReconcile()
+        public override void CreateReconcile()
         {
             ReconcileData rd = new ReconcileData(
                     transform.position,
-                    _pmComponent.Velocity,
-                    _characterController.height
+                    _pmComponent.Velocity
                 );
             
             ReconcileState(rd);
         }
         
+        [Replicate]
+        private void RunInputs(
+            ReplicateData data, 
+            ReplicateState state = ReplicateState.Invalid, 
+            Channel channel = Channel.Unreliable)
+        {
+
+            Debug.Log(state.ToString());
+            
+            if ( (IsServerStarted) || state == ReplicateState.Replayed)
+            {
+                // perform actual tick-wise update
+                CaptureMovementState(data);
+                ProcessMovementState(); 
+                ApplyMovementState();
+            }
+            else if (!IsServerStarted)
+            {
+                _currentReplicateData = data;
+            }
+            
+            
+        }
+
         [Reconcile]
         private void ReconcileState(ReconcileData data, Channel channel = Channel.Unreliable)
         {
-            // _characterController.enabled = false;
-            // transform.position = data.Origin;
-            // _pmComponent.Velocity = data.Velocity;
-            // _characterController.height = data.Height;
-            // _characterController.enabled = true;
-            // _characterController.Move(data.Origin - transform.position);
-            _pmComponent.Velocity = data.Velocity;
+            MoveCharacterForcefully(data.Origin - transform.position);
+        }
+
+        private void MoveCharacterForcefully(Vector3 moveVector)
+        {
+            _characterController.enabled = false;
+            transform.position += moveVector;
+            _characterController.enabled = false;
+        }
+
+        private void MoveCharacterController(Vector3 moveVector)
+        {
+            _pmComponent.IsOnLadder = false;
+            _pmComponent.CollisionNormalsBuffer.Clear();
+            _pmComponent.CollisionAnglesBuffer.Clear();
+            _pmComponent.CollisionCollidersBuffer.Clear();
+            _characterController.enabled = true;
+            _characterController.Move(moveVector);
         }
 
         private ReplicateData CreateReplicateData()
@@ -194,17 +245,6 @@ namespace PlayerMovement
             return md;
         }
         
-        [Replicate]
-        private void RunInputs(
-            ReplicateData data, 
-            ReplicateState state = ReplicateState.Invalid, 
-            Channel channel = Channel.Unreliable)
-        {
-            CaptureMovementState(data);
-            ProcessMovementState(); 
-            ApplyMovementState();
-        }
-        
         private void CaptureMovementState(ReplicateData replicateData)
         {
             // update pmComponent
@@ -216,8 +256,8 @@ namespace PlayerMovement
             _pmComponent.OldIsGrounded = _pmComponent.IsGrounded;
             _pmComponent.IsGrounded = _characterController.isGrounded;
             _pmComponent.CollisionFlags = _characterController.collisionFlags;
+            _pmComponent.DeltaTime = (float)TimeManager.TickDelta;
             _pmComponent.SlopeLimit = _characterController.slopeLimit;
-            _pmComponent.DeltaTime = Time.fixedDeltaTime;
             _pmComponent.Cmd.ForwardMovement = replicateData.ForwardMovement;
             _pmComponent.Cmd.SideMovement = replicateData.SideMovement;
             _pmComponent.Cmd.UpMovement = replicateData.UpMovement;
@@ -260,15 +300,9 @@ namespace PlayerMovement
             else if ( Mathf.Abs(_characterController.height - _pmComponent.Height) > 0.0001f )
                 _characterController.height = _pmComponent.Height;
             
-            // 4. clear old collision buffers and let Move() populate new ones for the new frame.
-            // calculate and apply displacement.
-            _pmComponent.IsOnLadder = false;
-            _pmComponent.CollisionNormalsBuffer.Clear();
-            _pmComponent.CollisionAnglesBuffer.Clear();
-            _pmComponent.CollisionCollidersBuffer.Clear();
+            // move character controller.
             Vector3 move = _pmComponent.Velocity * _pmComponent.DeltaTime;
-            _characterController.enabled = true;
-            _characterController.Move(move);
+            MoveCharacterController(move);
         }
         
         void OnControllerColliderHit(ControllerColliderHit hit)
@@ -282,34 +316,5 @@ namespace PlayerMovement
             if (hit.gameObject.TryGetComponent<Ladder>(out var _))
                 _pmComponent.IsOnLadder = true;
         }
-
-        public void Update()
-        {
-            if (!IsOwner) return;
-            // handle rotations client side every frame
-            _pmComponent.Cmd = _playerMovementInputEntity.GetPlayerMovementInputComponent();    // pull every frame
-            PlayerMovementSystemUtil.UpdateRotation(ref _pmComponent, cameraSensitivity);       // update every frame
-            _characterController.enabled = false;
-            _camera.transform.localEulerAngles = new Vector3(_pmComponent.CurrentPitch, 0f, 0f);
-            transform.localEulerAngles = new Vector3(0f, _pmComponent.CurrentYaw, 0f);
-            _characterController.enabled = true;
-        }
-
-        private bool CheckOwnedByHostAndIsHost()
-        {
-            if (!IsServerStarted) return false;
-            if (NetworkManager.ClientManager.Connection.ClientId == 0 && OwnerId == 0)
-            {
-                _isHost.Value = true;
-                return true;
-            }
-
-            _isHost.Value = false;
-            return false;
-        }
-        
-        public void SetExternalVelocity(Vector3 externalVelocity) 
-            => _externalVelocity = externalVelocity;
-        
     }
 }
