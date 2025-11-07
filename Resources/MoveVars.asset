@@ -1,0 +1,24 @@
+%YAML 1.1
+%TAG !u! tag:unity3d.com,2011:
+--- !u!114 &11400000
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 0}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 7bdeeca53e3574b4a9a3dfb723768c4b, type: 3}
+  m_Name: MoveVars
+  m_EditorClassIdentifier: Assembly-CSharp::MoveVars
+  gravity: 35
+  stopSpeed: 2.5
+  maxSpeed: 10
+  groundAccel: 1
+  airAccel: 0.6
+  slideAccel: 0.75
+  friction: 7.5
+  maxVelocity: 1000
+  moveSpeed: 7.5
+  jumpVelocity: 10
