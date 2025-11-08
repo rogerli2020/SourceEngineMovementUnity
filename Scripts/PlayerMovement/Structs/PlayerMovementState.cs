@@ -30,7 +30,7 @@ namespace PlayerMovement.Structs
         public MoveVars MoveStats;
         
         // commands
-        public PlayerMovementInputComponent Cmd;
+        public PlayerMovementInputStruct Cmd;
         
         // size
         public float Height;

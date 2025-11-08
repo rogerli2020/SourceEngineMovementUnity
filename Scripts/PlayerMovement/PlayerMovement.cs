@@ -4,16 +4,16 @@ using System.Collections.Generic;
 
 namespace PlayerMovement
 {
-    public class PlayerMovementEntity : MonoBehaviour
+    public class PlayerMovement : MonoBehaviour
     {
         // movement states
         private Structs.PlayerMovementComponent _pmComponent;
         
         // important references
         private Camera _camera;
-        private PlayerMovementInputEntity _playerMovementInputEntity;
+        private PlayerMovementInput.PlayerMovementInput _playerMovementInput;
         private CharacterController _characterController;
-        private PlayerMovementInputComponent _playerMovementInputComponent;
+        private PlayerMovementInputStruct _playerMovementInputStruct;
         
         // variables
         public float cameraSensitivity = 0.1f;
@@ -27,7 +27,7 @@ namespace PlayerMovement
         {
             // assign important references
             _camera = gameObject.GetComponentInChildren<Camera>();
-            _playerMovementInputEntity = GetComponent<PlayerMovementInputEntity>();
+            _playerMovementInput = GetComponent<PlayerMovementInput.PlayerMovementInput>();
             _characterController = GetComponent<CharacterController>();
             
             // initialize state data
@@ -60,15 +60,15 @@ namespace PlayerMovement
         private void CaptureMovementState()
         {
             // update input data
-            _playerMovementInputComponent = _playerMovementInputEntity.GetPlayerMovementInputComponent();
-            float pitchDelta = _playerMovementInputComponent.DeltaPitch * cameraSensitivity;
+            _playerMovementInputStruct = _playerMovementInput.GetPlayerMovementInputComponent();
+            float pitchDelta = _playerMovementInputStruct.DeltaPitch * cameraSensitivity;
             _currentPitch = Mathf.Clamp(_currentPitch - pitchDelta, -90f, 90f);
             _currentYaw = 
-                transform.eulerAngles.y + _playerMovementInputComponent.DeltaYaw * cameraSensitivity;
+                transform.eulerAngles.y + _playerMovementInputStruct.DeltaYaw * cameraSensitivity;
             
             // update input cmd
-            _playerMovementInputComponent.CurrentPitch = _currentPitch;
-            _playerMovementInputComponent.CurrentYaw = _currentYaw;
+            _playerMovementInputStruct.CurrentPitch = _currentPitch;
+            _playerMovementInputStruct.CurrentYaw = _currentYaw;
             
             // update pmComponent
             _pmComponent.Origin = transform.position;
@@ -82,7 +82,7 @@ namespace PlayerMovement
             _pmComponent.DeltaTime = Time.deltaTime;
             _pmComponent.CurrentPitch = _currentPitch;
             _pmComponent.CurrentYaw = _currentYaw;
-            _pmComponent.Cmd = _playerMovementInputComponent;
+            _pmComponent.Cmd = _playerMovementInputStruct;
             _pmComponent.ExternalVelocity = _externalVelocity;
             
             // zero out external velocity
@@ -91,8 +91,8 @@ namespace PlayerMovement
 
         private void ProcessMovementState()
         {
-            PlayerMovementSystemUtil.UpdateVelocity(ref _pmComponent);
-            PlayerMovementSystemUtil.UpdateCrouch(ref _pmComponent);
+            PlayerMovementUtil.UpdateVelocity(ref _pmComponent);
+            PlayerMovementUtil.UpdateCrouch(ref _pmComponent);
         }
 
         private void ApplyMovementState()

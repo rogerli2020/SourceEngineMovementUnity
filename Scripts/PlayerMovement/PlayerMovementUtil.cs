@@ -4,7 +4,7 @@ using Unity.VisualScripting;
 
 namespace PlayerMovement
 {
-    public static class PlayerMovementSystemUtil
+    public static class PlayerMovementUtil
     {
         // public const float CrouchJumpHeight = 0.45f;
         

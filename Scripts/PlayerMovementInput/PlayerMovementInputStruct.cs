@@ -1,6 +1,6 @@
 ﻿namespace PlayerMovementInput
 {
-    public struct PlayerMovementInputComponent
+    public struct PlayerMovementInputStruct
     {
         public float DeltaYaw;
         public float DeltaPitch;

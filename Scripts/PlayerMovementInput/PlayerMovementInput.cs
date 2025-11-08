@@ -3,14 +3,14 @@ using UnityEngine.InputSystem;
 
 namespace PlayerMovementInput
 {
-    public class PlayerMovementInputEntity : MonoBehaviour
+    public class PlayerMovementInput : MonoBehaviour
     {
         private InputAction _lookAction;
         private InputAction _moveAction;
         private InputAction _jumpAction;
         private InputAction _crouchAction;
         private InputAction _scrollWheelAction;
-        private PlayerMovementInputComponent _playerMovementInputComponent;
+        private PlayerMovementInputStruct _playerMovementInputStruct;
         
         // temporary, for rocket jumping
         private InputAction _fireAction;
@@ -45,18 +45,18 @@ namespace PlayerMovementInput
             bool jumpPressed = _jumpAction.IsPressed();
             // Vector2 scrollWheelValue = _scrollWheelAction.ReadValue<Vector2>();
 
-            _playerMovementInputComponent.DeltaPitch += lookValue.y;
-            _playerMovementInputComponent.DeltaYaw += lookValue.x;
-            _playerMovementInputComponent.ForwardMovement = moveValue.y;
-            _playerMovementInputComponent.SideMovement = moveValue.x;
+            _playerMovementInputStruct.DeltaPitch += lookValue.y;
+            _playerMovementInputStruct.DeltaYaw += lookValue.x;
+            _playerMovementInputStruct.ForwardMovement = moveValue.y;
+            _playerMovementInputStruct.SideMovement = moveValue.x;
             
             // if (scrollWheelValue.y < 0f)
             //     _playerMovementInputComponent.Crouching = true;
             // else if (scrollWheelValue.y > 0f)
             //     _playerMovementInputComponent.UpMovement = 1f;
             
-            _playerMovementInputComponent.UpMovement = jumpPressed ? 1f : 0f;
-            _playerMovementInputComponent.Crouching = crouchPressed;
+            _playerMovementInputStruct.UpMovement = jumpPressed ? 1f : 0f;
+            _playerMovementInputStruct.Crouching = crouchPressed;
             
                         
             // temporary, for rocket jumping
@@ -64,12 +64,12 @@ namespace PlayerMovementInput
             
         }
 
-        public PlayerMovementInputComponent GetPlayerMovementInputComponent()
+        public PlayerMovementInputStruct GetPlayerMovementInputComponent()
         {
-            var inputSnapshot = _playerMovementInputComponent;
+            var inputSnapshot = _playerMovementInputStruct;
 
-            _playerMovementInputComponent.DeltaPitch = 0f;
-            _playerMovementInputComponent.DeltaYaw = 0f;
+            _playerMovementInputStruct.DeltaPitch = 0f;
+            _playerMovementInputStruct.DeltaYaw = 0f;
 
             return inputSnapshot;
         }
