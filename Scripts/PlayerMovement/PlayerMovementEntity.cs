@@ -99,7 +99,7 @@ namespace PlayerMovement
         {
             // 1. check if is on ladder. (this is a pretty bad approach, but it does works like a ladder)
             if (_pmComponent.IsOnLadder)
-                _characterController.slopeLimit = 91f;
+                _characterController.slopeLimit = 89.95f;
             else
                 _characterController.slopeLimit = 45f;
             
