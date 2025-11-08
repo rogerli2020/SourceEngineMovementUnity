@@ -13,22 +13,41 @@ namespace PlayerMovement
         /// </summary>
         public static void UpdateVelocity(ref Structs.PlayerMovementComponent pm)
         {
-            CheckSliding(ref pm);   // check if you're surfing
+            // check if you're surfing
+            CheckSliding(ref pm);
 
-            if (pm.IsSliding) pm.IsGrounded = false;    // if you're surfing, follow air logic.
+            // if you're surfing, follow air logic.
+            if (pm.IsSliding) pm.IsGrounded = false;
 
+            // vertical movement
             HandleGravity(ref pm);
-            
-            // apply external velocity.
-            pm.Velocity += pm.ExternalVelocity;
             HandleJump(ref pm);
             
-            HandleFriction(ref pm);
+            // this block of code, and the variable "recoverIsGrounded"
+            // is used to ensure that we're not applying the ground movement
+            // constants/coefficients for the frame where you touched the ground
+            // during bhopping.
+            bool recoverIsGrounded = false;
+            if (!pm.OldIsGrounded && pm.IsGrounded)
+            {
+                pm.IsGrounded = false;
+                recoverIsGrounded = true;
+            };
             
+            // horizontal movement
+            HandleFriction(ref pm);
             HandleHorizontalMovement(ref pm);
             ClampHorizontalSpeed(ref pm);
             
+            // slide movement
             HandleSlide(ref pm);
+            
+            // reverse the tweak so pm.oldIsGrounded for the next frame
+            // is correct.
+            if (recoverIsGrounded) pm.IsGrounded = true;
+            
+            // apply external velocity.
+            pm.Velocity += pm.ExternalVelocity;
         }
         
         private static void CheckSliding(ref Structs.PlayerMovementComponent pm)
