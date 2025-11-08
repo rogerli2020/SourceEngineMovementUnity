@@ -13,12 +13,12 @@ MonoBehaviour:
   m_Name: MoveVars
   m_EditorClassIdentifier: Assembly-CSharp::MoveVars
   gravity: 35
-  stopSpeed: 2.5
+  stopSpeed: 10
   maxSpeed: 10
-  groundAccel: 1
-  airAccel: 0.6
-  slideAccel: 0.75
-  friction: 7.5
+  groundAccel: 5
+  airAccel: 0.7
+  slideAccel: 0.8
+  friction: 4
   maxVelocity: 1000
-  moveSpeed: 7.5
-  jumpVelocity: 10
+  moveSpeed: 8
+  jumpVelocity: 9
