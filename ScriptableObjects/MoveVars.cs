@@ -9,8 +9,8 @@ public class MoveVars : ScriptableObject
     public float stopSpeed = 10f;          
     public float maxSpeed = 10f;      
     public float groundAccel = 2f;
-    public float airAccel = 0.7f;
-    public float slideAccel = 1f;
+    public float airAccel = 1.25f;
+    public float slideAccel = 1.4f;
     public float friction = 4.5f;
     public float maxVelocity = 1000f;
     public float moveSpeed = 7.5f;

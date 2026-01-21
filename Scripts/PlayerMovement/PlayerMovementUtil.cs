@@ -37,7 +37,7 @@ namespace PlayerMovement
             // horizontal movement
             HandleFriction(ref pm);
             HandleHorizontalMovement(ref pm);
-            ClampHorizontalSpeed(ref pm);
+            // ClampHorizontalSpeed(ref pm);
             
             // slide movement
             HandleSlide(ref pm);
@@ -209,7 +209,19 @@ namespace PlayerMovement
             accelSpeed = acceleration * pm.DeltaTime * wishSpeed * pm.MoveStats.friction;
             accelSpeed = Mathf.Min(accelSpeed, addSpeed);
 
-            pm.Velocity += accelSpeed * wishDirection;
+            
+            // prevent speed gain from airstrafing when maxSpeed is reached.
+            if (pm.Velocity.magnitude >= pm.MoveStats.maxSpeed && !pm.IsSliding)
+            {
+                var oldSpeed = pm.Velocity.magnitude;
+                pm.Velocity += accelSpeed * wishDirection;
+                pm.Velocity = pm.Velocity.normalized * oldSpeed;
+            }
+            else
+            {
+                pm.Velocity += accelSpeed * wishDirection;
+            }
+            
             SanitizeVelocity(ref pm);
         }
 
